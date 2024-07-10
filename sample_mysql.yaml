@@ -1,0 +1,7 @@
+apiVersion: sahh.com/v1alpha1
+kind: MySQL
+metadata:
+  name: my-database
+spec:
+  size: 3
+  image: mysql:5.7

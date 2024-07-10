@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-operator-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-operator-controller
+  template:
+    metadata:
+      labels:
+        app: mysql-operator-controller
+    spec:
+      serviceAccountName: mysql-operator-sa
+      containers:
+      - name: mysql-operator-controller
+        image: your-operator-image
+        env:
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        command: ["/bin/bash", "-c", "--"]
+        args:
+        - |
+          while true; do
+            kubectl get mysql -o json | jq -r '.items[] | "\(.metadata.name) \(.spec.size) \(.spec.image)"' |
+            while read name size image; do
+              if [ $(kubectl get deployment $name --ignore-not-found | wc -l) -eq 0 ]; then
+                kubectl create deployment $name --image=$image
+                kubectl scale deployment $name --replicas=$size
+              fi
+              current_size=$(kubectl get deployment $name -o jsonpath='{.spec.replicas}')
+              if [ $current_size -ne $size ]; then
+                kubectl scale deployment $name --replicas=$size
+              fi
+            done
+            sleep 30
+          done
+      restartPolicy: Always
